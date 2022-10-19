@@ -7,6 +7,7 @@ import time
 import logging
 import argparse
 from sys import version_info
+import torch
 from common.logger_utils import initialize_logging
 from pytorch.utils import prepare_pt_context, prepare_model
 from pytorch.utils import calc_net_weight_count, validate
@@ -16,6 +17,8 @@ from pytorch.dataset_utils import get_dataset_metainfo
 from pytorch.dataset_utils import get_val_data_source, get_test_data_source
 from pytorch.model_stats import measure_model
 from pytorch.pytorchcv.models.model_store import _model_sha1
+from compress_model import compress_model
+from save_tensor_hooks import save_tensors_hooks
 
 
 def add_eval_cls_parser_arguments(parser):
@@ -114,6 +117,16 @@ def add_eval_cls_parser_arguments(parser):
         "--all",
         action="store_true",
         help="test all pretrained models for partucular dataset")
+    parser.add_argument(
+        "--save_tensors",
+        action="store_true",
+        help="save first batch input and output for every convolution"
+    )
+    parser.add_argument(
+        "--quantize_weights",
+        action="store_true",
+        help="quantize weights with floatq jobs"
+    )
 
 
 def parse_args():
@@ -376,7 +389,8 @@ def test_model(args):
         use_pretrained=args.use_pretrained,
         pretrained_model_file_path=args.resume.strip(),
         use_cuda=use_cuda,
-        num_classes=(args.num_classes if ds_metainfo.ml_type != "hpe" else None),
+        num_classes=(args.num_classes if ds_metainfo.ml_type !=
+                     "hpe" else None),
         in_channels=args.in_channels,
         net_extra_kwargs=ds_metainfo.test_net_extra_kwargs,
         load_ignore_extra=ds_metainfo.load_ignore_extra,
@@ -384,6 +398,13 @@ def test_model(args):
     input_image_size = update_input_image_size(
         net=net,
         input_size=(args.input_size if hasattr(args, "input_size") else None))
+
+    if args.save_tensors:
+        save_tensors_hooks(net)
+    
+    if args.quantize_weights:
+        compress_model(net)
+
     if args.show_progress:
         from tqdm import tqdm
         data_source = tqdm(data_source)
@@ -451,9 +472,11 @@ def main():
             if acc_value is not None:
                 exp_value = int(error) * 1e-4
                 if abs(acc_value - exp_value) > 2e-4:
-                    logging.info("----> Wrong value detected (expected value: {})!".format(exp_value))
+                    logging.info(
+                        "----> Wrong value detected (expected value: {})!".format(exp_value))
     else:
-        test_model(args=args)
+        with torch.no_grad():
+            test_model(args=args)
 
 
 if __name__ == "__main__":

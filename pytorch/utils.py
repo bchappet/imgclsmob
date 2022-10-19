@@ -205,6 +205,8 @@ def report_accuracy(metric,
             else:
                 return "{}={}".format("{}", "/".join(["{:.4f}"] * len(value))).format(name, *value)
         else:
+            name = 'top1'
+            value = (1 - value) * 100
             if extended_log:
                 return "{name}={value:.4f} ({value})".format(name=name, value=value)
             else:
