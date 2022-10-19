@@ -8,8 +8,8 @@ def float_to_floatq(tensor: torch.Tensor, exponent: int, name: str, bit_width: i
     """
     convert a tensor from a float32 dtype into a signed int type of width bit_width
     convert it back to float32 for simplicity
+    tensor: the tensor to quantize
 
-    tensor: 
     exponent: the tensor will be multiplied by 2**exponent
     bit_width: number of bit for signed intger type
     """
@@ -55,16 +55,15 @@ def find_exponent2(layer: nn.Module, weight: torch.Tensor, bit_width: int) -> in
 
 
 def find_exponent3(layer: nn.Module, weight: torch.Tensor, bit_width: int) -> int:
-    """return the exponent that minimize distance between layer's top with original weights
-    and layer's top with quantized weights
-
+    """
+    Find exponent using layer's bottom and top data
     Args:
         layer (torch.Module): pytorch layer's module
         weight (torch.Tensor): weight tensor
         bit_width (int): bit width for the signed integer representation
 
     Returns:
-        int: exponent that minimize layer's top distance
+        int: exponent
     """
     save_dir = './forward_data_float/'
     input_ref = torch.tensor(
@@ -82,7 +81,9 @@ def compress_model(net: nn.Module):
     Args:
         net (nn.Module): network
     """
+
     bit_width = 8
+
     for name, layer in net.named_modules():
         if isinstance(layer, nn.Conv2d):
             layer.name = name
